@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
     private final Handler handler = new Handler();
     private final ArrayList<String> pinnedPackages = new ArrayList<>();
     private LinearLayout bannerRow;
+    private WaveBackground backgroundView;
     private TextView clockView, dateView;
     private SharedPreferences preferences;
     private BroadcastReceiver packageReceiver;
@@ -96,7 +97,18 @@ public class MainActivity extends Activity {
 
     private void loadPins() {
         pinnedPackages.clear();
+        boolean hasSavedPins = preferences.contains(KEY_PINS);
         String saved = preferences.getString(KEY_PINS, "");
+        if (!hasSavedPins) {
+            // First installation: pin YouTube automatically when available.
+            String[] youtubePackages = {"com.google.android.youtube.tv", "com.google.android.youtube"};
+            for (String candidate : youtubePackages) {
+                if (getPackageManager().getLaunchIntentForPackage(candidate) != null) {
+                    pinnedPackages.add(candidate);
+                    break;
+                }
+            }
+        }
         if (!saved.isEmpty()) {
             String[] values = saved.split("\\n");
             PackageManager pm = getPackageManager();
@@ -125,7 +137,8 @@ public class MainActivity extends Activity {
     private void buildInterface() {
         FrameLayout root = new FrameLayout(this);
         root.setFocusable(true);
-        root.addView(new WaveBackground(this), new FrameLayout.LayoutParams(-1, -1));
+        backgroundView = new WaveBackground(this);
+        root.addView(backgroundView, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -152,11 +165,12 @@ public class MainActivity extends Activity {
 
         clockView = new TextView(this);
         clockView.setTextColor(Color.WHITE);
-        clockView.setTextSize(105);
+        clockView.setTextSize(getClockTextSize());
         clockView.setGravity(Gravity.CENTER);
         clockView.setLetterSpacing(-0.035f);
         clockView.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        clockView.setShadowLayer(dp(16), 0, 0, 0xFF167BFF);
+        clockView.setTextColor(getClockColor());
+        clockView.setShadowLayer(dp(16), 0, 0, getClockGlowColor());
         timeBox.addView(clockView);
 
         LinearLayout quick = new LinearLayout(this);
@@ -192,6 +206,7 @@ public class MainActivity extends Activity {
 
         ImageView appsIcon = new ImageView(this);
         appsIcon.setImageResource(R.drawable.ic_apps);
+        appsIcon.setContentDescription("Abrir aplicações");
         appsIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         appsIcon.setPadding(dp(12), dp(12), dp(12), dp(12));
         GradientDrawable iconBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
@@ -248,7 +263,7 @@ public class MainActivity extends Activity {
                 return true;
             });
 
-            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(dp(242), dp(150));
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(getBannerWidth(), getBannerHeight());
             cardParams.rightMargin = dp(14);
             if (i == 0) cardParams.leftMargin = dp(2);
             bannerRow.addView(card, cardParams);
@@ -259,7 +274,7 @@ public class MainActivity extends Activity {
                     new int[]{0x553B7CFF, 0x002020FF});
             reflectionBg.setCornerRadius(dp(14));
             reflection.setBackground(reflectionBg);
-            LinearLayout.LayoutParams reflectionParams = new LinearLayout.LayoutParams(dp(242), dp(12));
+            LinearLayout.LayoutParams reflectionParams = new LinearLayout.LayoutParams(getBannerWidth(), dp(10));
             reflectionParams.rightMargin = dp(14);
             reflection.setAlpha(0.55f);
             bannerRow.addView(reflection, reflectionParams);
@@ -280,7 +295,7 @@ public class MainActivity extends Activity {
             ImageView addIcon = new ImageView(this);
             addIcon.setImageResource(R.drawable.ic_add);
             addIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            add.addView(addIcon, new LinearLayout.LayoutParams(dp(56), dp(56)));
+            add.addView(addIcon, new LinearLayout.LayoutParams(getBannerIconSize(), getBannerIconSize()));
 
             TextView addText = new TextView(this);
             addText.setText("Adicionar");
@@ -296,7 +311,7 @@ public class MainActivity extends Activity {
                 animateFocus(add, focused);
                 addBg.setStroke(focused ? dp(3) : dp(2), focused ? 0xFF8BEAFF : 0xFF536DFF);
             });
-            LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(dp(150), dp(150));
+            LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(getBannerWidth(), getBannerHeight());
             addParams.leftMargin = dp(3);
             bannerRow.addView(add, addParams);
         }
@@ -323,12 +338,12 @@ public class MainActivity extends Activity {
         try { icon.setImageDrawable(getPackageManager().getApplicationIcon(info)); }
         catch (Exception ignored) { }
         icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        card.addView(icon, new LinearLayout.LayoutParams(dp(62), dp(62)));
+        card.addView(icon, new LinearLayout.LayoutParams(getBannerIconSize(), getBannerIconSize()));
 
         TextView label = new TextView(this);
         label.setText(getPackageManager().getApplicationLabel(info));
         label.setTextColor(Color.WHITE);
-        label.setTextSize(18);
+        label.setTextSize(getBannerTextSize());
         label.setGravity(Gravity.CENTER);
         label.setSingleLine(true);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -640,21 +655,79 @@ public class MainActivity extends Activity {
         registerReceiver(packageReceiver, filter);
     }
 
-    private void updateClock() {
+    private void refreshClockDisplay() {
         Date now = new Date();
-        clockView.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(now));
+        String clockFormat = preferences.getString("clock_format", "24");
+        clockView.setText(new SimpleDateFormat("12".equals(clockFormat) ? "hh:mm a" : "HH:mm", Locale.getDefault()).format(now));
         dateView.setText(new SimpleDateFormat("EEE, dd 'de' MMMM", new Locale("pt", "PT"))
                 .format(now).replace(".", ""));
-        handler.postDelayed(this::updateClock, 1000);
     }
+
+    private void updateClock() {
+        refreshClockDisplay();
+        handler.removeCallbacks(clockTick);
+        handler.postDelayed(clockTick, 1000);
+    }
+
+    private final Runnable clockTick = new Runnable() {
+        @Override public void run() {
+            refreshClockDisplay();
+            handler.postDelayed(this, 1000);
+        }
+    };
 
     private void openWifi() {
         try { startActivity(new Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)); }
         catch (Exception e) { openSettings(); }
     }
     private void openSettings() {
-        try { startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS)); }
+        try { startActivity(new Intent(this, SettingsActivity.class)); }
         catch (Exception ignored) { }
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (preferences != null && clockView != null) {
+            clockView.setTextSize(getClockTextSize());
+            clockView.setTextColor(getClockColor());
+            clockView.setShadowLayer(dp(16), 0, 0, getClockGlowColor());
+            refreshClockDisplay();
+            refreshPinnedBanners();
+            if (backgroundView != null) backgroundView.invalidate();
+        }
+    }
+
+    private int getBannerWidth() {
+        String size = preferences.getString("banner_size", "medium");
+        return dp("small".equals(size) ? 196 : ("large".equals(size) ? 280 : 242));
+    }
+    private int getBannerHeight() {
+        String size = preferences.getString("banner_size", "medium");
+        return dp("small".equals(size) ? 126 : ("large".equals(size) ? 174 : 150));
+    }
+    private int getBannerIconSize() {
+        String size = preferences.getString("banner_size", "medium");
+        return dp("small".equals(size) ? 50 : ("large".equals(size) ? 74 : 62));
+    }
+    private float getBannerTextSize() {
+        String size = preferences.getString("banner_size", "medium");
+        return "small".equals(size) ? 15f : ("large".equals(size) ? 21f : 18f);
+    }
+    private float getClockTextSize() {
+        String style = preferences.getString("clock_style", "classic");
+        return "compact".equals(style) ? 82f : ("bold".equals(style) ? 108f : 100f);
+    }
+    private int getClockColor() {
+        String color = preferences.getString("clock_color", "white");
+        if ("blue".equals(color)) return 0xFF8BCBFF;
+        if ("purple".equals(color)) return 0xFFD7A2FF;
+        return Color.WHITE;
+    }
+    private int getClockGlowColor() {
+        String color = preferences.getString("clock_color", "white");
+        if ("blue".equals(color)) return 0xFF168BFF;
+        if ("purple".equals(color)) return 0xFF9B35FF;
+        return 0xFF167BFF;
     }
 
     @Override public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -684,15 +757,19 @@ public class MainActivity extends Activity {
         WaveBackground(Context context) { super(context); }
         @Override protected void onDraw(Canvas canvas) {
             int w = getWidth(), h = getHeight();
+            boolean deep = preferences != null && "deep".equals(preferences.getString("background_style", "waves"));
             canvas.drawColor(0xFF020526);
             paint.setShader(new RadialGradient(w * .52f, h * .42f, w * .8f,
-                    new int[]{0xFF092B9B, 0xFF06145A, 0xFF02031D}, null, Shader.TileMode.CLAMP));
+                    deep ? new int[]{0xFF09205F, 0xFF06113D, 0xFF010316}
+                         : new int[]{0xFF092B9B, 0xFF06145A, 0xFF02031D}, null, Shader.TileMode.CLAMP));
             canvas.drawRect(0, 0, w, h, paint);
             paint.setShader(null);
-            drawWave(canvas, h * .23f, 0xFF174BFF, 0xFF00A8FF, 6f, .13f);
-            drawWave(canvas, h * .31f, 0xFF8A18FF, 0xFF1B5CFF, 3f, .17f);
-            drawWave(canvas, h * .78f, 0xFF075CFF, 0xFF8C18FF, 5f, .10f);
-            drawWave(canvas, h * .86f, 0xFF1A5DFF, 0xFFB000FF, 3f, .13f);
+            if (!deep) {
+                drawWave(canvas, h * .23f, 0xFF174BFF, 0xFF00A8FF, 6f, .13f);
+                drawWave(canvas, h * .31f, 0xFF8A18FF, 0xFF1B5CFF, 3f, .17f);
+                drawWave(canvas, h * .78f, 0xFF075CFF, 0xFF8C18FF, 5f, .10f);
+                drawWave(canvas, h * .86f, 0xFF1A5DFF, 0xFFB000FF, 3f, .13f);
+            }
         }
         private void drawWave(Canvas canvas, float base, int c1, int c2, float width, float amp) {
             float w = getWidth(), h = getHeight();
