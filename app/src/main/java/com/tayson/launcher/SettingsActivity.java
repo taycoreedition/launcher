@@ -105,7 +105,7 @@ public class SettingsActivity extends Activity {
                 R.drawable.ic_toggle_on);
 
         addAction("Definições do Android", "Abrir as configurações do dispositivo",
-                R.drawable.ic_settings, () -> {
+                R.drawable.ic_settings, V -> {
                     try {
                         startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS));
                     } catch (Exception e) {
