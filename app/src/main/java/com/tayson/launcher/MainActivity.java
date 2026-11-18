@@ -187,9 +187,11 @@ public class MainActivity extends Activity {
 
         HorizontalScrollView horizontal = new HorizontalScrollView(this);
         horizontal.setHorizontalScrollBarEnabled(false);
+        horizontal.setVerticalScrollBarEnabled(false);
+        horizontal.setHorizontalFadingEdgeEnabled(false);
         horizontal.setClipToPadding(false);
         horizontal.setFillViewport(false);
-        content.addView(horizontal, new LinearLayout.LayoutParams(-1, dp(190)));
+        content.addView(horizontal, new LinearLayout.LayoutParams(-1, dp(204)));
 
         bannerRow = new LinearLayout(this);
         bannerRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -263,21 +265,11 @@ public class MainActivity extends Activity {
                 return true;
             });
 
-            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(getBannerWidth(), getBannerHeight());
-            cardParams.rightMargin = dp(14);
+            LinearLayout.LayoutParams cardParams =
+                    new LinearLayout.LayoutParams(getBannerWidth(), getBannerHeight());
+            cardParams.rightMargin = dp(10);
             if (i == 0) cardParams.leftMargin = dp(2);
             bannerRow.addView(card, cardParams);
-
-            // Subtle low-cost reflection strip below the banner.
-            View reflection = new View(this);
-            GradientDrawable reflectionBg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{0x553B7CFF, 0x002020FF});
-            reflectionBg.setCornerRadius(dp(14));
-            reflection.setBackground(reflectionBg);
-            LinearLayout.LayoutParams reflectionParams = new LinearLayout.LayoutParams(getBannerWidth(), dp(10));
-            reflectionParams.rightMargin = dp(14);
-            reflection.setAlpha(0.55f);
-            bannerRow.addView(reflection, reflectionParams);
         }
 
         if (pinnedPackages.size() < MAX_PINS) {
@@ -349,7 +341,7 @@ public class MainActivity extends Activity {
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         label.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
-        labelParams.topMargin = dp(9);
+        labelParams.topMargin = dp(5);
         card.addView(label, labelParams);
 
         card.setOnFocusChangeListener((v, focused) -> {
@@ -545,10 +537,13 @@ public class MainActivity extends Activity {
         column.addView(gap, new LinearLayout.LayoutParams(-1, dp(18)));
 
         appsGrid = new GridView(this);
-        appsGrid.setNumColumns(4);
-        appsGrid.setHorizontalSpacing(dp(16));
-        appsGrid.setVerticalSpacing(dp(16));
+        appsGrid.setNumColumns(GridView.AUTO_FIT);
+        appsGrid.setColumnWidth(dp(160));
+        appsGrid.setHorizontalSpacing(dp(12));
+        appsGrid.setVerticalSpacing(dp(12));
         appsGrid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
+        appsGrid.setHorizontalScrollBarEnabled(false);
+        appsGrid.setVerticalScrollBarEnabled(false);
         appsGrid.setSelector(android.R.color.transparent);
         appsGrid.setOnItemClickListener((parent, view, position, id) -> {
             String pkg = appsList.get(position).packageName;
@@ -583,8 +578,8 @@ public class MainActivity extends Activity {
         card.setGravity(Gravity.CENTER);
         card.setFocusable(true);
         card.setClickable(true);
-        card.setPadding(dp(10), dp(10), dp(10), dp(10));
-        card.setLayoutParams(new AbsListView.LayoutParams(-1, dp(150)));
+        card.setPadding(dp(6), dp(6), dp(6), dp(6));
+        card.setLayoutParams(new AbsListView.LayoutParams(-1, dp(164)));
 
         int[] colors = gradients[index % gradients.length];
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
@@ -597,7 +592,7 @@ public class MainActivity extends Activity {
         try { icon.setImageDrawable(pm.getApplicationIcon(info)); }
         catch (Exception ignored) { }
         icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        card.addView(icon, new LinearLayout.LayoutParams(dp(64), dp(64)));
+        card.addView(icon, new LinearLayout.LayoutParams(dp(108), dp(108)));
 
         TextView label = new TextView(this);
         label.setText(pm.getApplicationLabel(info));
@@ -608,7 +603,7 @@ public class MainActivity extends Activity {
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         label.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
-        labelParams.topMargin = dp(9);
+        labelParams.topMargin = dp(5);
         card.addView(label, labelParams);
 
         card.setOnFocusChangeListener((v, focused) -> {
@@ -698,20 +693,16 @@ public class MainActivity extends Activity {
     }
 
     private int getBannerWidth() {
-        String size = preferences.getString("banner_size", "medium");
-        return dp("small".equals(size) ? 196 : ("large".equals(size) ? 280 : 242));
+        return dp(320);
     }
     private int getBannerHeight() {
-        String size = preferences.getString("banner_size", "medium");
-        return dp("small".equals(size) ? 126 : ("large".equals(size) ? 174 : 150));
+        return dp(180);
     }
     private int getBannerIconSize() {
-        String size = preferences.getString("banner_size", "medium");
-        return dp("small".equals(size) ? 50 : ("large".equals(size) ? 74 : 62));
+        return dp(76);
     }
     private float getBannerTextSize() {
-        String size = preferences.getString("banner_size", "medium");
-        return "small".equals(size) ? 15f : ("large".equals(size) ? 21f : 18f);
+        return 18f;
     }
     private float getClockTextSize() {
         String style = preferences.getString("clock_style", "classic");
